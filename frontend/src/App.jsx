@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell
 } from "recharts";
 
-const API = "http://127.0.0.1:8000";
+const API = "https://job-market-intelligence-3.onrender.com";
 
 const COLORS = ["#6366f1", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe", "#e0e7ff"];
 
