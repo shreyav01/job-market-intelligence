@@ -1,6 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
-import psycopg2
+import psycopg
 import os
 import time
 import re
@@ -21,7 +21,7 @@ SKILLS = [
 ]
 
 def get_connection():
-    return psycopg2.connect(os.getenv("DATABASE_URL"))
+    return psycopg.connect(os.getenv("DATABASE_URL"))
 
 def extract_skills(text):
     text = text.lower()

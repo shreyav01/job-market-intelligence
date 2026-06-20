@@ -1,11 +1,11 @@
-import psycopg2
+import psycopg
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
 def get_connection():
-    return psycopg2.connect(os.getenv("DATABASE_URL"))
+    return psycopg.connect(os.getenv("DATABASE_URL"))
 
 def test_connection():
     try:
