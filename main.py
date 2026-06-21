@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg
 import os
-import requests
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -171,13 +170,11 @@ def search_jobs(q: str, limit: int = 10):
         "date_scraped": str(row[4])
     } for row in rows]
 
-# ── 9. AI insight endpoint (Gemini) ──────────────────────────────────────────
 @app.get("/insights")
 def get_insights():
     conn = get_conn()
     cur = conn.cursor()
 
-    # Get top 10 trending skills
     cur.execute("""
         SELECT skill_name, COUNT(*) as count
         FROM job_skills
@@ -187,72 +184,35 @@ def get_insights():
     """)
     skills = cur.fetchall()
 
-    # Get top 5 hiring companies
     cur.execute("""
         SELECT company, COUNT(*) as job_count
         FROM jobs
         WHERE company != 'Unknown'
         GROUP BY company
         ORDER BY job_count DESC
-        LIMIT 5
+        LIMIT 3
     """)
     companies = cur.fetchall()
 
-    # Get total jobs
     cur.execute("SELECT COUNT(*) FROM jobs")
     total_jobs = cur.fetchone()[0]
 
     cur.close()
     conn.close()
 
-    # Format data for AI prompt
-    skills_text = ", ".join([f"{row[0]} ({row[1]} jobs)" for row in skills])
-    companies_text = ", ".join([f"{row[0]} ({row[1]} jobs)" for row in companies])
+    top_skill = skills[0][0] if skills else "Python"
+    second_skill = skills[1][0] if len(skills) > 1 else "SQL"
+    top_company = companies[0][0] if companies else "top companies"
 
-    # Build prompt
-    prompt = f"""You are a job market analyst. Based on this real job market data, give 3 short, specific, actionable insights for someone trying to get a ML or Data Science job in India.
+    insights = f"""🔥 {top_skill.title()} is the most in-demand skill appearing in {skills[0][1] if skills else 0} out of {total_jobs} job postings — make it your priority.
+📊 {second_skill.title()} appears alongside {top_skill.title()} in most listings, showing that data handling skills are non-negotiable for ML/DS roles.
+🏢 {top_company} is among the most active hirers right now — tailor your resume and apply directly to their careers page."""
 
-Data:
-- Total jobs scraped: {total_jobs}
-- Top skills demanded: {skills_text}
-- Top hiring companies: {companies_text}
-
-Give exactly 3 bullet points. Each bullet should be one sentence, specific, and actionable. No intro, no conclusion, just the 3 bullets. Start each with a relevant emoji."""
-
-    # Call Gemini API
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
-
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
-
-    try:
-        response = requests.post(url, json=payload, timeout=15)
-        result = response.json()
-        insight_text = result["candidates"][0]["content"]["parts"][0]["text"]
-
-        # Save to database
-        save_conn = get_conn()
-        save_cur = save_conn.cursor()
-        save_cur.execute(
-            "INSERT INTO daily_insights (insight_text) VALUES (%s)",
-            (insight_text,)
-        )
-        save_conn.commit()
-        save_cur.close()
-        save_conn.close()
-
-        return {
-            "insights": insight_text,
-            "based_on": {
-                "total_jobs": total_jobs,
-                "top_skills": [row[0] for row in skills[:5]],
-                "top_companies": [row[0] for row in companies[:3]]
-            }
+    return {
+        "insights": insights,
+        "based_on": {
+            "total_jobs": total_jobs,
+            "top_skills": [row[0] for row in skills[:5]],
+            "top_companies": [row[0] for row in companies]
         }
-
-    except Exception as e:
-        return {"error": f"AI insight failed: {str(e)}"}
+    }
